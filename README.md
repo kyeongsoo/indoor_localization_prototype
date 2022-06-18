@@ -1,5 +1,5 @@
 # indoor_localization_prototype
-A prototype indoor localization system based on streamlit Web interface.
+A prototype indoor localization system based on streamlit web interface.
 ![prototype screenshot](images/prototype_screenshot.png)
 
 ## Prerequisites
