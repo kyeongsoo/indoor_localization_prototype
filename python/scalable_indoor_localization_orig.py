@@ -4,8 +4,7 @@
 # @file     scalable_indoor_localization.py
 # @author   Kyeong Soo (Joseph) Kim <kyeongsoo.kim@gmail.com>
 # @date     2017-11-15
-#           2020-12-20 updated for TensorFlow ver. 2.x
-#           2021-12-01 use EarlyStopping
+#           2020-12-20 (updated for TensorFlow ver. 2.x)
 #
 # @brief    Build and evaluate a scalable indoor localization system
 #           based on Wi-Fi fingerprinting using a neural-network-based
@@ -32,6 +31,7 @@ import os
 import math
 import numpy as np
 import pandas as pd
+import sys
 from sklearn.preprocessing import scale
 from timeit import default_timer as timer
 
@@ -67,8 +67,7 @@ path_validation = '../data/UJIIndoorLoc/validationData2.csv'    # ditto
 #------------------------------------------------------------------------
 path_base = '../results/' + os.path.splitext(os.path.basename(__file__))[0]
 path_out =  path_base + '_out'
-path_sae_model = path_base + '_sae_model'
-path_model = path_base + '_model'
+path_sae_model = path_base + '_sae_model.hdf5'
 
 
 if __name__ == "__main__":
@@ -88,14 +87,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "-E",
         "--epochs",
-        help="maximum number of epochs; default is 100",
-        default=100,
+        help="number of epochs; default is 20",
+        default=20,
         type=int)
     parser.add_argument(
         "-B",
         "--batch_size",
-        help="batch size; default is 64",
-        default=64,
+        help="batch size; default is 10",
+        default=10,
         type=int)
     parser.add_argument(
         "-T",
@@ -121,8 +120,8 @@ if __name__ == "__main__":
         "-D",
         "--dropout",
         help=
-        "dropout rate before and after classifier hidden layers; default 0.25",
-        default=0.25,
+        "dropout rate before and after classifier hidden layers; default 0.2",
+        default=0.2,
         type=float)
     parser.add_argument(
         "-N",
@@ -170,7 +169,6 @@ if __name__ == "__main__":
     from tensorflow.keras.layers import Dense, Dropout
     from tensorflow.keras import Sequential
     from tensorflow.keras.models import load_model
-    from tensorflow.keras.callbacks import EarlyStopping
 
     # read both train and test dataframes for consistent label formation through one-hot encoding
     train_df = pd.read_csv(path_train, header=0)  # pass header=0 to be able to replace existing names
@@ -219,7 +217,7 @@ if __name__ == "__main__":
     ### build SAE encoder model
     print("\nPart 1: buidling an SAE encoder ...")
     # if False:
-    if os.path.isdir(path_sae_model) and (os.path.getmtime(path_sae_model) > os.path.getmtime(__file__)):
+    if os.path.isfile(path_sae_model) and (os.path.getmtime(path_sae_model) > os.path.getmtime(__file__)):
         model = load_model(path_sae_model)
     else:
         # create a model based on stacked autoencoder (SAE)
@@ -231,8 +229,7 @@ if __name__ == "__main__":
         model.compile(optimizer=SAE_OPTIMIZER, loss=SAE_LOSS)
 
         # train the model
-        callback = EarlyStopping(monitor='loss', mode='min', patience=5, restore_best_weights=True)
-        model.fit(x_train, x_train, batch_size=batch_size, epochs=epochs, callbacks=[callback], verbose=VERBOSE)
+        model.fit(x_train, x_train, batch_size=batch_size, epochs=epochs, verbose=VERBOSE)
 
         # remove the decoder part
         num_to_remove = (len(sae_hidden_layers) + 1) // 2
@@ -253,35 +250,28 @@ if __name__ == "__main__":
     #     0: building_weight, 1: building_weight, 2: building_weight,  # buildings
     #     3: floor_weight, 4: floor_weight, 5: floor_weight, 6:floor_weight, 7: floor_weight  # floors
     # }
-    if os.path.isdir(path_model) and (os.path.getmtime(path_model) > os.path.getmtime(__file__)):
-        model = load_model(path_model)
-    else:
-        model.add(Dropout(dropout, name="droupout-0"))
-        for i in range(len(classifier_hidden_layers)):
-            model.add(Dense(classifier_hidden_layers[i], name="classifier-hidden-"+str(i), activation=CLASSIFIER_ACTIVATION, use_bias=CLASSIFIER_BIAS))
-            model.add(Dropout(dropout, name="droupout-"+str(i+1)))
-        model.add(Dense(OUTPUT_DIM, name="activation-0", activation='sigmoid', use_bias=CLASSIFIER_BIAS))  # 'sigmoid' for multi-label classification
-        model.compile(optimizer=CLASSIFIER_OPTIMIZER, loss=CLASSIFIER_LOSS, metrics=['accuracy'])
+    model.add(Dropout(dropout))
+    for i in range(len(classifier_hidden_layers)):
+        model.add(Dense(classifier_hidden_layers[i], name="classifier-hidden"+str(i), activation=CLASSIFIER_ACTIVATION, use_bias=CLASSIFIER_BIAS))
+        model.add(Dropout(dropout))
+    model.add(Dense(OUTPUT_DIM, name="activation-0", activation='sigmoid', use_bias=CLASSIFIER_BIAS))  # 'sigmoid' for multi-label classification
+    model.compile(optimizer=CLASSIFIER_OPTIMIZER, loss=CLASSIFIER_LOSS, metrics=['accuracy'])
 
-        # train the model
-        startTime = timer()
-        callback = EarlyStopping(monitor='val_loss', mode='min', patience=5, restore_best_weights=True)
-        model.fit(x_train, y_train, validation_data=(x_val, y_val), batch_size=batch_size, epochs=epochs, callbacks=[callback], verbose=VERBOSE)
-        elapsedTime = timer() - startTime
-        print("Model trained in %e s." % elapsedTime)
-
-        # save the model for later use
-        model.save(path_model)
+    # train the model
+    startTime = timer()
+    model.fit(x_train, y_train, validation_data=(x_val, y_val), batch_size=batch_size, epochs=epochs, verbose=VERBOSE)
+    elapsedTime = timer() - startTime
+    print("Model trained in %e s." % elapsedTime)
     
-    ### evaluate the model
-    print("\nPart 3: evaluating the model ...")
-
     # turn the given validation set into a testing set
     test_AP_features = scale(np.asarray(test_df.iloc[:,0:520]).astype(float), axis=1)  # convert integer to float and scale jointly (axis=1)
     x_test_utm = np.asarray(test_df['LONGITUDE'])
     y_test_utm = np.asarray(test_df['LATITUDE'])
     blds = blds_all[len_train:]
     flrs = flrs_all[len_train:]
+
+    ### evaluate the model
+    print("\nPart 3: evaluating the model ...")
 
     # calculate the accuracy of building and floor estimation
     preds = model.predict(test_AP_features, batch_size=batch_size)

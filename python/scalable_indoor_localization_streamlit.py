@@ -1,27 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 ##
-# @file     scalable_indoor_localization.py
+# @file     scalable_indoor_localization_streamlit.py
 # @author   Kyeong Soo (Joseph) Kim <kyeongsoo.kim@gmail.com>
 # @date     2017-11-15
 #           2020-12-20 updated for TensorFlow ver. 2.x
 #           2021-12-01 use EarlyStopping
+#           2022-04-22 Implemented web interface based on streamlit
 #
-# @brief    Build and evaluate a scalable indoor localization system
-#           based on Wi-Fi fingerprinting using a neural-network-based
-#           multi-label classifier.
+# @brief    A prototype indoor localization system based on streamlit
+#           web interface and DNN-based scalable indoor localization scheme [1].
 #
-# @remarks  This work is based on the <a href="https://keras.io/">Keras</a>-based
-#           implementation of the system described in "<a
-#           href="https://arxiv.org/abs/1611.02049v2">Low-effort place
-#           recognition with WiFi fingerprints using deep learning</a>".
-#
-#           The results are published in the following paper:
-#           Kyeong Soo Kim, Sanghyuk Lee, and Kaizhu Huang "A scalable deep
-#           neural network architecture for multi-building and multi-floor
-#           indoor localization based on Wi-Fi fingerprinting," Big Data
-#           Analytics, vol. 3, no. 4, pp. 1-17, Apr. 19, 2018. Available online:
-#           https://doi.org/10.1186/s41044-018-0031-2
+# @remarks  References
+#           [1] Kyeong Soo Kim, Sanghyuk Lee, and Kaizhu Huang,
+#               "A scalable deep neural network architecture for multi-building
+#               and multi-floor indoor localization based on Wi-Fi fingerprinting,"
+#               Big Data Analytics, vol. 3, no. 4, pp. 1-17, Apr. 19, 2018.
+#               Available online: https://doi.org/10.1186/s41044-018-0031-2
 #
 
 # import modules
@@ -39,7 +34,7 @@ st.title('Wi-Fi Indoor Localization')
 # define global constants
 path_train = '../data/UJIIndoorLoc/trainingData2.csv'           # '-110' for the lack of AP.
 path_validation = '../data/UJIIndoorLoc/validationData2.csv'    # ditto
-path_model = 'my_model'
+path_model = '../results/scalable_indoor_localization_model'
 N = 8
 scaling = 0.2
 training_ratio = 0.9
